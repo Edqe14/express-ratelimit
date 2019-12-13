@@ -1,7 +1,7 @@
 {
   "name": "express-ratelimit",
   "version": "1.0.0",
-  "description": "",
+  "description": "Rate limiter middleware for express",
   "main": "src/limiter.js",
   "scripts": {
     "test": "node test/index.js"

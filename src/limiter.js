@@ -1,4 +1,6 @@
 const express = require('express');
+const { getIpAndVerify } = require('./ip.js');
+const { limit } = require('./utils.js');
 
 /**
  * Create new rate limiter middleware
@@ -24,20 +26,14 @@ module.exports = (o) => {
     this.router = express.Router();
     this.router.use((req, res, next) => {
         // Get IP
-        var xff = (req.headers['x-forwarded-for'] || '').replace(/:\d+$/, '');
-        var ip = xff || req.connection.remoteAddress;
-        if (ip.includes('::ffff:')) {
-            ip = ip.split(':').reverse()[0]
-        };
-
-        if ((ip === '127.0.0.1' || ip === '::1')) {
-            next()
-            return console.warn('localhost use detected')
-        };
+        let ip = getIpAndVerify(req);
+        // if(ip == 'localhost') {
+        //     next();
+        //     console.warn("localhost detected!")
+        // }
 
         let listedIP = this.limit.get(ip);
-
-        // No IP in list
+        // If no IP in the list..
         if(!listedIP) {
             this.limit.set(ip, {
                 counter: 1,
@@ -46,24 +42,16 @@ module.exports = (o) => {
                     if(this.limit.get(ip) !== undefined) this.limit.delete(ip)
                 }, this.options.timer*1000)
             });
-            return next()
+            return next();
         }
 
-        // If IP already limited
+        // If IP already limited..
         if(listedIP.limited) return res.status(429).send(this.options.message);
 
         // Start to update limit list
         listedIP.counter++
         if(listedIP.counter > this.options.max) {
-            listedIP.limited = true
-            clearTimeout(listedIP.timeout)
-
-            listedIP.timeout = setTimeout(() => {
-                if(this.limit.get(ip) !== undefined) this.limit.delete(ip)
-            }, this.options.expire*1000)
-
-            this.limit.set(ip, listedIP)
-            return res.status(429).send(this.options.message);
+            return limit(ip, listedIP, this.limit, this.options.expire, this.options.message, res);
         } else {
             clearTimeout(listedIP.timeout)
 
