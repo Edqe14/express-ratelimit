@@ -1,6 +1,5 @@
 const express = require('express');
 const { getIpAndVerify } = require('./ip.js');
-const { limit } = require('./utils.js');
 
 /**
  * Create new rate limiter middleware
@@ -49,7 +48,7 @@ module.exports = (o) => {
         // Start to update limit list
         listedIP.counter++
         if(listedIP.counter > this.options.max) {
-            return limit(ip, listedIP, this.limit, this.options.expire, this.options.message, res);
+            return this.handler(ip, listedIP, this.limit, this.options.expire, this.options.message, res);
         } else {
             clearTimeout(listedIP.timeout)
 
@@ -60,8 +59,28 @@ module.exports = (o) => {
             this.limit.set(ip, listedIP);
         }
 
-        next()
+        next();
     });
     
     return this.router;
+}
+
+/**
+ * @param {String} ip User IP
+ * @param {Object} listedIP User limit object
+ * @param {Map<String>} map Map of limit
+ * @param {Number} expire Limit expire
+ * @param {*} message Limited message/response
+ * @param {express.response} res Express response object
+ */
+module.exports.handler = function limit(ip, listedIP, map, expire, message, res) {
+    listedIP.limited = true
+    clearTimeout(listedIP.timeout)
+
+    listedIP.timeout = setTimeout(() => {
+        if (map.get(ip) !== undefined) map.delete(ip)
+    }, expire * 1000)
+
+    map.set(ip, listedIP)
+    return res.status(429).send(message);
 }
