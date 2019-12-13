@@ -6,6 +6,12 @@ const limiter = limit({
     max: 10,
     timer: 10,
     expire: 20
+});
+
+limiter.setHandler(function a(next) {
+    "aaaa
+    console.log('a')
+    next()
 })
 app.use('/api', limiter)
 app.get('/api', (req, res) => {

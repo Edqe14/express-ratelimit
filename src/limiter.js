@@ -1,21 +1,45 @@
 const express = require('express');
 const { getIpAndVerify } = require('./ip.js');
 
+
+
+/**
+ * @param {String} ip User IP
+ * @param {Object} listedIP User limit object
+ * @param {Map<String>} map Map of limit
+ * @param {Number} expire Limit expire
+ * @param {*} message Limited message/response
+ * @param {express.response} res Express response object
+ */
+let handler = function limit(next, ip, listedIP, map, code, expire, message, res) {
+    listedIP.limited = true
+    clearTimeout(listedIP.timeout)
+
+    listedIP.timeout = setTimeout(() => {
+        if (map.get(ip) !== undefined) map.delete(ip)
+    }, expire * 1000)
+
+    map.set(ip, listedIP)
+    return res.status(code).send(message);
+}
+
 /**
  * Create new rate limiter middleware
  * @param {object} o Settings for the limiter
  * 
- * @param {number} o.max Maximum request in timer
- * @param {number} o.timer Time for reset limit counter (In Seconds)
- * @param {number} o.expire How long the rate limit wear off
+ * @param {Number} o.max Maximum request in timer
+ * @param {Number} o.timer Time for reset limit counter (In Seconds)
+ * @param {Number} o.expire How long the rate limit wear off
  * @param {*} o.message Rate limited message
+ * @param {Number} o.code Rate limit response code (429)
  */
 module.exports = (o) => {
     this.options = {
         max: o.max || 10, // max request in timer
         timer: o.timer || 20, // time request, in secs
         expire: o.expire || 60, // stop limiting time, in secs
-        message: o.message || "You\'ve been rate limited. Please try again later" // rate limited message
+        message: o.message || "You\'ve been rate limited. Please try again later", // rate limited message
+        code: o.code || 429 // Response code
     }
 
     this.limit = new Map();
@@ -26,7 +50,7 @@ module.exports = (o) => {
         let ip = getIpAndVerify(req);
         if(ip == 'localhost') {
             next();
-            console.warn("localhost detected!")
+            return console.warn("localhost detected! This won\'t be tracked")
         }
 
         let listedIP = this.limit.get(ip);
@@ -43,12 +67,12 @@ module.exports = (o) => {
         }
 
         // If IP already limited..
-        if(listedIP.limited) return res.status(429).send(this.options.message);
+        if(listedIP.limited) return res.status(this.options.code).send(this.options.message);
 
         // Start to update limit list
         listedIP.counter++
         if(listedIP.counter > this.options.max) {
-            return this.handler(ip, listedIP, this.limit, this.options.expire, this.options.message, res);
+            return handler(next, ip, listedIP, this.limit, this.options.code, this.options.expire, this.options.message, res);
         } else {
             clearTimeout(listedIP.timeout)
 
@@ -62,25 +86,15 @@ module.exports = (o) => {
         next();
     });
     
+    this.router.setHandler = setHandler;
     return this.router;
 }
 
 /**
- * @param {String} ip User IP
- * @param {Object} listedIP User limit object
- * @param {Map<String>} map Map of limit
- * @param {Number} expire Limit expire
- * @param {*} message Limited message/response
- * @param {express.response} res Express response object
+ * @param {Function} func New handler function
  */
-module.exports.handler = function limit(ip, listedIP, map, expire, message, res) {
-    listedIP.limited = true
-    clearTimeout(listedIP.timeout)
+function setHandler(func) {
+    if(!(func instanceof Function)) throw TypeError("Handler input type is not a function.");
 
-    listedIP.timeout = setTimeout(() => {
-        if (map.get(ip) !== undefined) map.delete(ip)
-    }, expire * 1000)
-
-    map.set(ip, listedIP)
-    return res.status(429).send(message);
+    handler = func;
 }

@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/Edqe14/express-ratelimit#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "vm2": "^3.8.4"
   }
 }
