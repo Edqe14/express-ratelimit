@@ -10,15 +10,13 @@ const { limit } = require('./utils.js');
  * @param {number} o.timer Time for reset limit counter (In Seconds)
  * @param {number} o.expire How long the rate limit wear off
  * @param {*} o.message Rate limited message
- * @param {object[]=} [o.paths=[]] Use paths
  */
 module.exports = (o) => {
     this.options = {
         max: o.max || 10, // max request in timer
         timer: o.timer || 20, // time request, in secs
         expire: o.expire || 60, // stop limiting time, in secs
-        message: o.message || "You\'ve been rate limited. Please try again later", // rate limited message
-        paths: o.paths || [] // rate limit paths
+        message: o.message || "You\'ve been rate limited. Please try again later" // rate limited message
     }
 
     this.limit = new Map();
@@ -27,10 +25,10 @@ module.exports = (o) => {
     this.router.use((req, res, next) => {
         // Get IP
         let ip = getIpAndVerify(req);
-        // if(ip == 'localhost') {
-        //     next();
-        //     console.warn("localhost detected!")
-        // }
+        if(ip == 'localhost') {
+            next();
+            console.warn("localhost detected!")
+        }
 
         let listedIP = this.limit.get(ip);
         // If no IP in the list..

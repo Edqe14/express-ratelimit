@@ -7,7 +7,10 @@ const limiter = limit({
     timer: 10,
     expire: 20
 })
-app.use(limiter)
+app.use('/api', limiter)
+app.get('/api', (req, res) => {
+    res.status(200).send(req.connection.remoteAddress)
+})
 
 app.get('/', (req, res) => {
     res.status(200).send('Hello World');
